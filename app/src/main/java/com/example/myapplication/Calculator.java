@@ -1,193 +1,101 @@
 package com.example.myapplication;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 public class Calculator {
-    static ArrayList<StringBuilder> listOperands;
-    static Stack<StringBuilder> operationStack;
+    static List<StringBuilder> listOperands;
+    static Stack<Operation> operationStack;
     static Stack<StringBuilder> valuesStack;
 
-    public static void Init() {
+    public static void init() {
         operationStack = new Stack<>();
         valuesStack = new Stack<>();
     }
 
-    public static int Priority(StringBuilder o) {
-        int r=-1;
-        switch (o.toString())
-        {
-            case "(":
-                r=0;
-                break;
-            case "+":
-            case "-":
-                r=1;
-                break;
-            case "*":
-            case "/":
-                r=2;
-                break;
-            case "^":
-                r=3;
-        }
-        return r;
-    }
-
     public static void execution() {
-        double a1, a2, r;
-        StringBuilder v1, v2;
-        StringBuilder op;
 
-        v2 = valuesStack.pop();
-        v1 = valuesStack.pop();
-        op = operationStack.pop();
+        double a2 = Double.parseDouble(valuesStack.pop().toString());
+        double a1 = Double.parseDouble(valuesStack.pop().toString());
+        Operation operation = operationStack.pop();
+        valuesStack.push(new StringBuilder(Double.toString(operation.action(a1,a2))));
 
-        a1 = Double.parseDouble(v1.toString());
-        a2 = Double.parseDouble(v2.toString());
-
-        r = 0.0;
-        switch (op.toString())
-        {
-            case "+":
-                r= additionValues(a1, a2);
-                break;
-            case "-":
-                r=subtractionValues(a1, a2);
-                break;
-            case "*":
-                r=multiplicationValues(a1, a2);
-                break;
-            case "/":
-                r=divisionValues(a1, a2);
-                break;
-            case "^":
-                r=Math.pow(a1, a2);
-                break;
-        }
-
-        v1 = new StringBuilder(Double.toString(r));
-        valuesStack.push(v1);
-
-    }
-
-    public static double divisionValues(double a1, double a2) {
-        return  a1 / a2;
-    }
-
-    public static double multiplicationValues(double a1, double a2) {
-        return a1 * a2;
-    }
-
-    public static double subtractionValues(double a1, double a2) {
-        return a1 - a2;
-    }
-
-    public static double additionValues(double a1, double a2) {
-        return a1 + a2;
     }
 
     public static void calculate(String F) {
-        int i;
-        StringBuilder current, top;
+        Operation current;
+        Operation top;
 
-        Init();
+        init();
         parse(F);
 
-        for (i = 0; i <= listOperands.size() - 1; i++) {
-            current = listOperands.get(i);
-            switch (current.toString()) {
-                case "(":
-                    operationStack.push(current);
-                    break;
-                case "+":
-                case "-":
-                case "*":
-                case "/":
-                case "^":
-                    if (operationStack.isEmpty()) {
+        for (int i = 0; i <= listOperands.size() - 1; i++) {
+            current = Operation.getOperation(listOperands.get(i).toString());
+            if (current != null) {
+                switch (current) {
+                    case BRACKET_LEFT:
                         operationStack.push(current);
                         break;
-                    }
-                    top = operationStack.peek();
-                    if (Priority(current) > Priority(top)) {
-                        operationStack.push(current);
-                        break;
-                    } else {
-                        execution();
-                        operationStack.push(current);
-                        break;
-                    }
-                case ")":
-                    while (true) {
-                        top = operationStack.peek();
-                        if (top.toString().equals("(")) {
-                            top = operationStack.pop();
+                    case PLUS:
+                    case MINUS:
+                    case MULTIPLICATION:
+                    case DIVISION:
+                    case EXPONENTIAL:
+                        if (operationStack.isEmpty()) {
+                            operationStack.push(current);
                             break;
                         }
-                        execution();
-                    }
-                    break;
-                default:
-                    valuesStack.push(current);
-            }
+                        top = operationStack.peek();
+                        if (current.getPriority() > top.getPriority()) {
+                            operationStack.push(current);
+                            break;
+                        } else {
+                            execution();
+                            operationStack.push(current);
+                            break;
+                        }
+                    case BRACKET_RIGHT:
+                        while (true) {
+                            top = operationStack.peek();
+                            if (top.getTitle().equals("(")) {
+                                top = operationStack.pop();
+                                break;
+                            }
+                            execution();
+                        }
+                        break;
+                    default:
+                }
+            } else
+                valuesStack.push(listOperands.get(i));
         }
 
         while (!operationStack.isEmpty()) {
             execution();
         }
-
     }
 
     public static void parse(String formula) {
-        char s;
-        int i;
-        StringBuilder formulaString = normalisationString(formula);
+        StringBuilder formulaString = new StringBuilder(formula);
 
         StringBuilder Tmp = new StringBuilder();
         listOperands = new ArrayList<>();
-        for (i = 0; i < formulaString.length(); i++) {
-            s = formulaString.charAt(i);
-            switch (s) {
-                case '+':
-                case '*':
-                case '^':
-                case '/':
-                case '(':
-                case ')':
+        for (int i = 0; i < formulaString.length(); i++) {
+            char s = formulaString.charAt(i);
+            if (isOperation(s)) {
+                if (s == '-' && (i == 0 || isOperation(formulaString.charAt(i - 1)))) {
+                    Tmp.append(s);
+                } else {
                     if (Tmp.length() > 0) {
                         listOperands.add(Tmp);
                         Tmp = new StringBuilder();
                     }
                     listOperands.add(new StringBuilder(Character.toString(s)));
-                    break;
-                case '-':
-                    if (i == 0 || isOperation(formulaString.charAt(i - 1))) {
-                        Tmp.append(s);
-                    } else {
-                        if (Tmp.length() > 0) {
-                            listOperands.add(Tmp);
-                            Tmp = new StringBuilder();
-                        }
-
-                        listOperands.add(new StringBuilder(Character.toString(s)));
-                    }
-                    break;
-                default:
-                    Tmp.append(s);
-            }
+                }
+            } else Tmp.append(s);
         }
         if (Tmp.length() > 0) listOperands.add(Tmp);
-    }
-
-    private static StringBuilder normalisationString(String formula) {
-        StringBuilder str = new StringBuilder(formula);
-        int index = str.indexOf("\n");
-        while (index >= 0) {
-            str.deleteCharAt(index);
-            index = str.indexOf("\n");
-        }
-        return str;
     }
 
     private static boolean isOperation(char s) {
@@ -200,8 +108,9 @@ public class Calculator {
             case '(':
             case ')':
                 return true;
+            default:
+                return false;
         }
-        return false;
     }
 
 }
